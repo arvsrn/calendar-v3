@@ -3,6 +3,7 @@
     import { app, monthNames, dayNames } from "$lib/state";
     import Sidebar from "./Sidebar.svelte";
     import Timezones from "./Timezones.svelte";
+    import { Calendar, DropdownMenu } from "bits-ui";
     
     export let scroll = 0;
 
@@ -99,7 +100,71 @@
     <div class="w-full h-full flex flex-col overflow-hidden">
         <nav class="w-full h-[52px] flex-none flex flex-row pl-6 pr-4 gap-2 items-center">
             <p class="text-sm text-white select-none font-medium">February <span class="text-gray5">2024</span></p>
-            <button class="px-2 leading-5 text-[11px] text-gray5 font-medium bg-rgba3 rounded-md select-none">W5</button>
+
+            <DropdownMenu.Root>
+                <DropdownMenu.Trigger class="px-2 leading-5 text-[11px] text-gray5 font-medium bg-rgba3 rounded-md select-none hover:bg-[rgba(255,255,255,0.3)]">
+                    W5
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Content class="z-[100]">
+                    <Calendar.Root
+                        class="mt-1 rounded-[15px] border border-rgba3 bg-background p-4 bg-gray2"
+                        let:months
+                        let:weekdays
+                        weekdayFormat="short"
+                        fixedWeeks={true}
+                    >
+                        <Calendar.Header class="flex items-center justify-between text-white">
+                            <Calendar.PrevButton class="inline-flex size-7 items-center justify-center rounded-md bg-transparent hover:bg-rgba3 active:scale-98 active:transition-all">
+                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M9 11L5.5 7.5L9 4" stroke="currentColor"/>
+                                </svg>
+                            </Calendar.PrevButton>
+                            
+                            <Calendar.Heading class="text-[13px] font-medium" />
+
+                            <Calendar.NextButton class="inline-flex size-7 items-center justify-center rounded-md bg-transparent hover:bg-rgba3 active:scale-98 active:transition-all">
+                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M6 4L9.5 7.5L6 11" stroke="currentColor"/>
+                                </svg>
+                            </Calendar.NextButton>
+                        </Calendar.Header>
+
+                        <div class="flex flex-col space-y-4 pt-2 sm:flex-row sm:space-x-4 sm:space-y-0">
+                            {#each months as month, i (i)}
+                                <Calendar.Grid class="w-full border-collapse select-none space-y-1">
+                                    <Calendar.GridHead>
+
+                                    <Calendar.GridRow class="mb-1 flex w-full justify-between">
+                                        {#each weekdays as day}
+                                            <Calendar.HeadCell class="w-7 rounded-md text-[11px] !font-normal font-mono text-gray5">
+                                                <div>{day.slice(0, 2)}</div>
+                                            </Calendar.HeadCell>
+                                        {/each}
+                                    </Calendar.GridRow>
+
+                                    </Calendar.GridHead>
+
+                                    <Calendar.GridBody>
+                                        {#each month.weeks as weekDates}
+                                            <Calendar.GridRow class="flex w-full">
+                                            {#each weekDates as date}
+                                                <Calendar.Cell {date} class="relative size-7 !p-0 text-center text-xs" >
+                                                    <Calendar.Day {date} month={month.value} class="relative inline-flex size-7 items-center justify-center whitespace-nowrap rounded-md border border-transparent bg-transparent p-0 text-xs font-normal text-white hover:bg-rgba2 data-[disabled]:pointer-events-none data-[outside-month]:pointer-events-none data-[outside-month]:text-gray5 data-[selected]:bg-rgba3 data-[selected]:font-medium data-[disabled]:text-foreground/30 data-[selected]:text-background data-[unavailable]:text-muted-foreground data-[unavailable]:line-through">
+                                                        <div class="absolute top-[5px] hidden size-1 rounded-full bg-foreground group-data-[today]:block group-data-[selected]:bg-background"/>
+                                                        {date.day}
+                                                    </Calendar.Day>
+                                                </Calendar.Cell>
+                                            {/each}
+                                            </Calendar.GridRow>
+                                        {/each}
+                                    </Calendar.GridBody>
+                                </Calendar.Grid>
+                            {/each}
+                        </div>
+                    </Calendar.Root>
+                </DropdownMenu.Content>
+            </DropdownMenu.Root>
+
             <div class="flex flex-row">
                 <button class="w-5 h-5 flex flex-col items-center justify-center rounded-md hover:bg-rgba3">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -134,9 +199,27 @@
         </nav>
 
         <!-- svelte-ignore a11y-no-static-element-interactions -->
-        <div bind:this={viewport} class="w-full h-full flex flex-row overflow-scroll scrollbar-hidden" on:mousedown={Viewport.onMouseDown} on:scroll|preventDefault={Viewport.onScroll}>
+        <div bind:this={viewport} class="w-full h-full flex flex-row overflow-scroll scrollbar-hidden relative" on:mousedown={Viewport.onMouseDown} on:scroll|preventDefault={Viewport.onScroll}>
             {#each [...Array(8+2).keys()] as d} 
                 {@const currentDate = new Date(start + (d * day))}
+
+                <div id="floating" class="fixed top-[52px] h-[60px] w-fit flex flex-col z-50 right-0 bg-transparent">
+                    <div class="h-9 w-fit flex items-center justify-center">
+                        <button class="w-6 h-6 rounded-md bg-transparent hover:bg-rgba3 flex items-center justify-center">
+                            <svg width="21" height="21" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M14 9.5H7M10.5 13V6M7 14.5H14" stroke="#A0A0A0"/>
+                            </svg>       
+                        </button>                     
+                    </div>
+                    <div class="h-6 w-fit flex items-center justify-center">
+                        <button class="w-6 h-6 rounded-md bg-transparent hover:bg-rgba3 flex items-center justify-center">
+                            <svg width="21" height="21" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 9L10.5 6.5L13 9" stroke="#A0A0A0"/>
+                                <path d="M13 12L10.5 14.5L8 12" stroke="#A0A0A0"/>
+                            </svg>
+                        </button>                                               
+                    </div>
+                </div>
 
                 <div class="h-screen flex-none" style:width="{columnWidth}px">
                     <div class="w-full sticky top-0 z-20">
