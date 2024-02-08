@@ -384,7 +384,7 @@
     }
 
     .draggable-event {
-        transition: height 0.3s var(--ease), top 0.3s var(--ease);
+        transition: height 75ms var(--ease), top 75ms var(--ease);
     }
 
     .align-vertical {
