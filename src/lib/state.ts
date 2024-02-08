@@ -13,6 +13,14 @@ interface State {
     creatingNewEvent: boolean,
 }
 
+export interface CalendarEvent {
+    startTime: number;
+    endTime: number;
+    title: string;
+    description: string;
+    color: 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'pink' | 'gray';
+}
+
 export let app: Writable<State> = writable({
     currentYear: 2024,
     currentMonth: 'February',

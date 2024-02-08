@@ -1,9 +1,10 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { app, monthNames, dayNames } from "$lib/state";
+    import { app, monthNames, dayNames, type CalendarEvent } from "$lib/state";
     import Sidebar from "./Sidebar.svelte";
     import Timezones from "./Timezones.svelte";
     import { Calendar, DropdownMenu } from "bits-ui";
+    import { slide } from "svelte/transition";
     
     export let scroll = 0;
 
@@ -15,9 +16,24 @@
     const day = 8_64_00_000; // one day in milliseconds
 
     let viewportHeld: boolean = false;
-    let creatingElementIn: string | null = null;
-    let creatingElementDragging: boolean = false;
-    let creatingElementHandlePosition: number = 0;
+    
+    let creatingEventIn: string | null = null;
+    let creatingEventDragging: boolean = false;
+    let creatingEventHandlePosition: number = 0;
+    let creatingEventStartPosition: number = 0;
+    let creatingEventEndPosition: number = 0;
+    let showCreatingEventHandle: boolean = true;
+
+    let days: Array<CalendarEvent[]> = new Array(10).fill([
+        {
+            startTime: 60,
+            endTime: 135,
+            title: 'Lunch',
+            description: 'Consume food',
+            color: 'yellow'
+        }
+    ]);
+
     let start = Date.now();
 
     onMount(() => {
@@ -68,18 +84,46 @@
 
         static onColumnMouseEnter(event: MouseEvent) {
             const element = event.target as HTMLElement;
-            setTimeout(() => creatingElementIn = element.id, 10);
+            setTimeout(() => creatingEventIn = element.id, 10);
         }
 
         static onColumnMouseLeave() {
-            creatingElementIn = null;
+            creatingEventIn = null;
         }
 
         static onColumnMouseMove(event: MouseEvent) {
             const element = event.target as HTMLElement;
 
-            if (element.id === creatingElementIn)
-                creatingElementHandlePosition = event.offsetY;
+            if (element.id === creatingEventIn)
+                creatingEventHandlePosition = event.offsetY;
+            
+            if (creatingEventDragging)
+                creatingEventEndPosition = creatingEventHandlePosition;
+        }
+
+        static onColumnMouseDown() {
+            if ($app.creatingNewEvent) {
+                creatingEventDragging = true;
+                creatingEventStartPosition = creatingEventHandlePosition;
+                creatingEventEndPosition = creatingEventHandlePosition;
+                showCreatingEventHandle = false;
+            }
+        }
+
+        static onColumnMouseUp() {
+            creatingEventDragging = false;
+            showCreatingEventHandle = true;
+            
+            if (creatingEventIn && $app.creatingNewEvent)
+                days[parseInt(creatingEventIn)] = [...days[parseInt(creatingEventIn)], {
+                    startTime: creatingEventStartPosition - (creatingEventStartPosition % 15),
+                    endTime: creatingEventEndPosition - (creatingEventEndPosition % 15),
+                    title: 'New Event',
+                    description: '',
+                    color: 'gray'
+                }];
+
+            $app.creatingNewEvent = false;
         }
     }
 
@@ -229,18 +273,84 @@
                         <div class="h-6 w-full border-b border-t border-r border-rgba2 bg-gray2" class:weekend={[0, 6].includes(currentDate.getDay())}></div>
                     </div>
 
-                    <div class="w-full relative border-r border-rgba2 bg-gray2" style:height="{60 * 1.0 * 25}px" class:weekend={[0, 6].includes(currentDate.getDay())} id={d.toString()} class:creating-new-event={creatingElementIn === d.toString()} on:mouseenter={Viewport.onColumnMouseEnter} on:mousemove={Viewport.onColumnMouseMove} on:mouseleave={Viewport.onColumnMouseLeave}>
-                        <div class:translucent={$app.creatingNewEvent} class="transition-opacity duration-300 ease-ease absolute top-[120px] h-[121px] w-[calc(100%-4px)] left-1 bg-[#2F4655] rounded flex flex-row gap-1.5 p-[3px] select-none">
-                            <div class="h-full rounded-sm w-[4px] bg-[#4CA8DF]"></div>
+                    <div class="w-full relative border-r border-rgba2 bg-gray2" style:height="{60 * 1.0 * 25}px" class:weekend={[0, 6].includes(currentDate.getDay())} id={d.toString()} class:creating-new-event={creatingEventIn === d.toString()} on:mouseenter={Viewport.onColumnMouseEnter} on:mousemove={Viewport.onColumnMouseMove} on:mouseleave={Viewport.onColumnMouseLeave} on:mousedown={Viewport.onColumnMouseDown} on:mouseup={Viewport.onColumnMouseUp}>
+                        {#each days[d] as event} 
+                            {@const startTime = Math.min(event.startTime, event.endTime)}
+                            {@const height = Math.abs(event.startTime - event.endTime)}
                             
-                            <div class="flex flex-col py-0.5">
-                                <p class="text-xs text-[#BDE6FF] leading-4 ">Lunch</p>
-                                <p class="text-[11px] text-[#84A6BB] leading-4 ">12—1PM</p>
-                            </div>
-                        </div>
+                            {@const finalStartTime = event.startTime}
+                            {@const finalEndTime = event.endTime}
                         
-                        {#if $app.creatingNewEvent && creatingElementIn === d.toString()}
-                            <div class="absolute w-[calc(100%-4px)] left-1 rounded h-[3px] bg-[rgba(255,255,255,0.5)] z-50" style:top="{creatingElementHandlePosition}px"></div>
+                            <div 
+                                class:translucent={$app.creatingNewEvent} 
+                                class="{event.color} calendar-event cursor-grab transition-opacity duration-300 ease-ease absolute w-[calc(100%-4px)] left-1 rounded flex flex-row gap-1.5 p-[3px] select-none" 
+                                style:top="{startTime - (startTime % 15)}px"
+                                style:height="{height - (height % 15)}px"
+                            >
+                                <div data-color class="h-full rounded-sm w-[4px]"></div>
+                                
+                                <div class="flex flex-col py-0.5">
+                                    <p data-title class="text-xs leading-4 ">{event.title}</p>
+                                    <p data-description class="text-xs leading-4 ">{event.description}</p>
+                                    <p data-timestamp class="text-[11px] leading-4 ">
+                                        {
+                                            Math.floor(finalStartTime/60) <= 12 ? 
+                                                Math.floor(finalStartTime/60) 
+                                                : Math.floor(finalStartTime/60) - 12
+                                        }{Math.floor(((finalStartTime/60)%1)*60) !== 0 ? `:${Math.floor(((finalStartTime/60)%1)*60) < 10 ? '0' + Math.floor(((finalStartTime/60)%1)*60) : Math.floor(((finalStartTime/60)%1)*60)}` : ''}{
+                                            (Math.floor(finalEndTime/60) < 12 ? 'AM' : 'PM') ===
+                                            (Math.floor(finalStartTime/60) < 12 ? 'AM' : 'PM') ? '' : (Math.floor(finalStartTime/60) < 12 ? 'AM' : 'PM')
+                                        }—{
+                                            Math.floor(finalEndTime/60) <= 12 ? 
+                                                Math.floor(finalEndTime/60) 
+                                                : Math.floor(finalEndTime/60) - 12
+                                        }{Math.floor(((finalEndTime/60)%1)*60) !== 0 ? `:${Math.floor(((finalEndTime/60)%1)*60) < 10 ? '0' + Math.floor(((finalEndTime/60)%1)*60) : Math.floor(((finalEndTime/60)%1)*60)}` : ''}{
+                                            Math.floor(finalEndTime/60) < 12 ? 'AM' : 'PM'
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                        {/each}
+                        
+                        {#if $app.creatingNewEvent && creatingEventIn === d.toString() && showCreatingEventHandle}
+                            <div class="absolute w-[calc(100%-4px)] left-1 rounded h-[3px] bg-[rgba(255,255,255,0.5)] z-50" style:top="{creatingEventHandlePosition}px"></div>
+                        {/if}
+
+                        {#if creatingEventDragging && creatingEventIn === d.toString()} 
+                            {@const startTime_ = Math.min(creatingEventEndPosition, creatingEventStartPosition)}
+                            {@const height_ = Math.abs(creatingEventStartPosition - creatingEventEndPosition)}
+
+                            {@const startTime = startTime_ - (startTime_ % 15)}
+                            {@const height = height_ - (height_ % 15)}
+
+                            {@const finalStartTime = startTime}
+                            {@const finalEndTime = startTime + height}
+
+                            <div style:top="{startTime}px" style:height="{height}px" class:align-vertical={height <= 30} class="gray calendar-event draggable-event overflow-hidden absolute w-[calc(100%-4px)] left-1 bg-[#2F4655] rounded flex flex-row gap-1.5 p-[3px] select-none pointer-events-none">
+                                <div data-color class="h-full rounded-sm w-[4px]"></div>
+                                <div class="flex flex-col py-0.5">
+                                    {#if height > 30}
+                                        <p data-title class="text-xs leading-4" transition:slide={{ duration: 300 }}>New Event</p>
+                                    {/if}
+                                    
+                                    <p data-timestamp class="text-[11px] leading-4 ">
+                                        {
+                                            Math.floor(finalStartTime/60) <= 12 ? 
+                                                Math.floor(finalStartTime/60) 
+                                                : Math.floor(finalStartTime/60) - 12
+                                        }{Math.floor(((finalStartTime/60)%1)*60) !== 0 ? `:${Math.floor(((finalStartTime/60)%1)*60) < 10 ? '0' + Math.floor(((finalStartTime/60)%1)*60) : Math.floor(((finalStartTime/60)%1)*60)}` : ''}{
+                                            (Math.floor(finalEndTime/60) < 12 ? 'AM' : 'PM') ===
+                                            (Math.floor(finalStartTime/60) < 12 ? 'AM' : 'PM') ? '' : (Math.floor(finalStartTime/60) < 12 ? 'AM' : 'PM')
+                                        }—{
+                                            Math.floor(finalEndTime/60) <= 12 ? 
+                                                Math.floor(finalEndTime/60) 
+                                                : Math.floor(finalEndTime/60) - 12
+                                        }{Math.floor(((finalEndTime/60)%1)*60) !== 0 ? `:${Math.floor(((finalEndTime/60)%1)*60) < 10 ? '0' + Math.floor(((finalEndTime/60)%1)*60) : Math.floor(((finalEndTime/60)%1)*60)}` : ''}{
+                                            Math.floor(finalEndTime/60) < 12 ? 'AM' : 'PM'
+                                        }
+                                    </p>
+                                </div>
+                            </div>
                         {/if}
 
                         {#each [...Array(24).keys()] as i} 
@@ -271,6 +381,61 @@
     .translucent {
         opacity: 50%;
         pointer-events: none;
+    }
+
+    .draggable-event {
+        transition: height 0.3s var(--ease), top 0.3s var(--ease);
+    }
+
+    .align-vertical {
+        align-items: center;
+    }
+
+    .blue {
+        --color: #4CA8DF;
+    }
+
+    .orange {
+        --color: #FF7D32;
+    }
+
+    .green {
+        --color: #42D692;
+    }
+    
+    .red {
+        --color: #FF3838;
+    }
+
+    .yellow {
+        --color: #FFB932;
+    }
+
+    .gray {
+        --color: #FFFFFF;
+    }
+
+    .pink {
+        --color: #F043FF;
+    }
+    
+    .calendar-event {
+        background: color-mix(in srgb, var(--color) 20%, #202020);
+    }
+
+    .calendar-event > [data-color] {
+        background: var(--color);
+    }
+
+    .calendar-event > div > [data-title],
+    .calendar-event > div > [data-description],
+    .calendar-event > div > [data-timestamp] {
+        color: color-mix(in srgb, white 20%, var(--color));
+    }
+
+    .calendar-event > div > [data-description],
+    .calendar-event > div > [data-timestamp] {
+        opacity: 60%
     }
 
     * {

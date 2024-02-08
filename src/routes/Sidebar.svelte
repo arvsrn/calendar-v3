@@ -64,38 +64,40 @@
         <button class="text-gray5 text-xs h-full box-content hover:text-white px-2" class:tab-selected={tab === 1} on:click={() => tab = 1}>Chat</button>
         <button class="text-gray5 text-xs h-full box-content hover:text-white px-2" class:tab-selected={tab === 2} on:click={() => tab = 2}>Email</button>
     </div>
-    <div class="w-full h-fit px-4 py-3 flex flex-col">
-        {#each tasks as task, i}
-            <!--svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events-->
-            <div class="w-full h-fit p-2 flex flex-row gap-2 select-none hover:bg-rgba2 rounded-md cursor-pointer" on:click={() => task.done = !task.done}>
-                <div class="flex items-center justify-center w-3.5 h-3.5 rounded bg-rgba2 border border-rgba2 my-[3px]" class:done={task.done}>
-                    {#if task.done}
-                        <svg width="8" height="6" viewBox="0 0 8 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <g clip-path="url(#clip0_292_2393)">
-                                <path d="M0.5 3L3 5.5V5.5C3.99624 3.83967 5.19233 2.30777 6.56149 0.938611L7 0.500102" stroke="white"/>
-                            </g>
-                            <defs>
-                                <clipPath id="clip0_292_2393">
-                                <rect width="8" height="6" fill="white"/>
-                                </clipPath>
-                            </defs>
-                        </svg>               
-                    {/if}
+    {#if tab === 0}
+        <div class="w-full h-fit px-4 py-3 flex flex-col">
+            {#each tasks as task, i}
+                <!--svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events-->
+                <div class="w-full h-fit p-2 flex flex-row gap-2 select-none hover:bg-rgba2 rounded-md cursor-pointer" on:click={() => task.done = !task.done}>
+                    <div class="flex items-center justify-center w-3.5 h-3.5 rounded bg-rgba2 border border-rgba2 my-[3px]" class:done={task.done}>
+                        {#if task.done}
+                            <svg width="8" height="6" viewBox="0 0 8 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <g clip-path="url(#clip0_292_2393)">
+                                    <path d="M0.5 3L3 5.5V5.5C3.99624 3.83967 5.19233 2.30777 6.56149 0.938611L7 0.500102" stroke="white"/>
+                                </g>
+                                <defs>
+                                    <clipPath id="clip0_292_2393">
+                                    <rect width="8" height="6" fill="white"/>
+                                    </clipPath>
+                                </defs>
+                            </svg>               
+                        {/if}
+                    </div>
+                    <div class="w-full flex flex-col">
+                        <p class="text-white leading-5 text-xs" class:translucent={task.done}>{task.title}</p>
+                        <p class="text-gray5 leading-5 text-xs" class:translucent={task.done}>{task.description}</p>
+                    </div>
                 </div>
-                <div class="w-full flex flex-col">
-                    <p class="text-white leading-5 text-xs" class:translucent={task.done}>{task.title}</p>
-                    <p class="text-gray5 leading-5 text-xs" class:translucent={task.done}>{task.description}</p>
-                </div>
-            </div>
-        {/each}
+            {/each}
 
-        <div class="w-full h-fit p-2 pl-[30px] flex flex-col">
-            <div class="w-[258px] h-1 rounded bg-rgba3 relative overflow-hidden">
-                <div class="h-full bg-[#ABEFCC] rounded" style:transition="width 75ms var(--ease)" style:width="{percentage}%"></div>
+            <div class="w-full h-fit p-2 pl-[30px] flex flex-col">
+                <div class="w-[258px] h-1 rounded bg-rgba3 relative overflow-hidden">
+                    <div class="h-full bg-[#ABEFCC] rounded" style:transition="width 75ms var(--ease)" style:width="{percentage}%"></div>
+                </div>
+                <p class="text-[10px] leading-5 text-white select-none">{percentage}% complete</p>
             </div>
-            <p class="text-[10px] leading-5 text-white select-none">{percentage}% complete</p>
         </div>
-    </div>
+    {/if}
 </div>
 
 <style>
