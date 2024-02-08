@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { app, monthNames, dayNames, type CalendarEvent } from "$lib/state";
+    import { app, monthNames, dayNames, type CalendarEvent, DraggingEvent } from "$lib/state";
     import Sidebar from "./Sidebar.svelte";
     import Timezones from "./Timezones.svelte";
     import { Calendar, DropdownMenu } from "bits-ui";
@@ -22,17 +22,25 @@
     let creatingEventHandlePosition: number = 0;
     let creatingEventStartPosition: number = 0;
     let creatingEventEndPosition: number = 0;
-    let showCreatingEventHandle: boolean = true;
+    let creatingEventHandleShow: boolean = true;
 
-    let days: Array<CalendarEvent[]> = new Array(10).fill([
-        {
-            startTime: 60,
-            endTime: 135,
-            title: 'Lunch',
-            description: 'Consume food',
-            color: 'yellow'
-        }
-    ]);
+    let editEventIn: string | null;
+    let editEventDragging: string | null;
+    let editEventDraggingHandle: DraggingEvent;
+
+    let days: Array<CalendarEvent[]> = [];
+    
+    for (let i = 0; i < 10; i++) {
+        days.push([
+           {
+                startTime: 60,
+                endTime: 135,
+                title: 'Lunch',
+                description: 'Consume food',
+                color: 'yellow'
+            }
+        ]);
+    }
 
     let start = Date.now();
 
@@ -77,14 +85,14 @@
         }
 
         static onMouseMove(event: MouseEvent) {
-            if (viewportHeld && !$app.creatingNewEvent) {
+            if (viewportHeld && !$app.creatingNewEvent && !editEventDragging) {
                 viewport.scroll(viewport.scrollLeft-event.movementX, viewport.scrollTop);
             }
         }
 
         static onColumnMouseEnter(event: MouseEvent) {
             const element = event.target as HTMLElement;
-            setTimeout(() => creatingEventIn = element.id, 10);
+            setTimeout(() => creatingEventIn = element.dataset.id || null, 10);
         }
 
         static onColumnMouseLeave() {
@@ -94,11 +102,48 @@
         static onColumnMouseMove(event: MouseEvent) {
             const element = event.target as HTMLElement;
 
-            if (element.id === creatingEventIn)
+            if (element.dataset.id === creatingEventIn)
                 creatingEventHandlePosition = event.offsetY;
             
             if (creatingEventDragging)
                 creatingEventEndPosition = creatingEventHandlePosition;
+            
+            if (editEventDragging && editEventIn) {
+                const column = parseInt(editEventIn);
+                const event_ = parseInt(editEventDragging);
+
+                console.log(editEventDraggingHandle);
+                
+                switch (editEventDraggingHandle) {
+                    case DraggingEvent.BOTTOM:
+                        days[column][event_].endTime += event.movementY;
+                        break;
+                        
+                    case DraggingEvent.TOP:
+                        days[column][event_].startTime += event.movementY;
+                        break;
+                        
+                    case DraggingEvent.WHOLE:
+                        days[column][event_].startTime += event.movementY;
+                        days[column][event_].endTime += event.movementY;
+                        break;
+                }
+            }
+        }
+
+        static onEventMouseDown(event: MouseEvent, columnId: number, eventId: number) {
+            editEventDragging = eventId.toString();
+            editEventIn = columnId.toString();
+
+            const newStartTime = Math.min(days[columnId][eventId].startTime, days[columnId][eventId].endTime);
+            const newEndTime = Math.max(days[columnId][eventId].startTime, days[columnId][eventId].endTime);
+
+            days[columnId][eventId].startTime = newStartTime;
+            days[columnId][eventId].endTime = newEndTime;
+        }
+
+        static setDragging(type: DraggingEvent) {
+            editEventDraggingHandle = type;
         }
 
         static onColumnMouseDown() {
@@ -106,24 +151,27 @@
                 creatingEventDragging = true;
                 creatingEventStartPosition = creatingEventHandlePosition;
                 creatingEventEndPosition = creatingEventHandlePosition;
-                showCreatingEventHandle = false;
+                creatingEventHandleShow = false;
             }
         }
 
         static onColumnMouseUp() {
             creatingEventDragging = false;
-            showCreatingEventHandle = true;
+            creatingEventHandleShow = true;
             
             if (creatingEventIn && $app.creatingNewEvent)
                 days[parseInt(creatingEventIn)] = [...days[parseInt(creatingEventIn)], {
-                    startTime: creatingEventStartPosition - (creatingEventStartPosition % 15),
-                    endTime: creatingEventEndPosition - (creatingEventEndPosition % 15),
+                    startTime: creatingEventStartPosition,
+                    endTime: creatingEventEndPosition,
                     title: 'New Event',
                     description: '',
                     color: 'gray'
                 }];
 
             $app.creatingNewEvent = false;
+
+            editEventDragging = null;
+            editEventIn = null;
         }
     }
 
@@ -273,8 +321,8 @@
                         <div class="h-6 w-full border-b border-t border-r border-rgba2 bg-gray2" class:weekend={[0, 6].includes(currentDate.getDay())}></div>
                     </div>
 
-                    <div class="w-full relative border-r border-rgba2 bg-gray2" style:height="{60 * 1.0 * 25}px" class:weekend={[0, 6].includes(currentDate.getDay())} id={d.toString()} class:creating-new-event={creatingEventIn === d.toString()} on:mouseenter={Viewport.onColumnMouseEnter} on:mousemove={Viewport.onColumnMouseMove} on:mouseleave={Viewport.onColumnMouseLeave} on:mousedown={Viewport.onColumnMouseDown} on:mouseup={Viewport.onColumnMouseUp}>
-                        {#each days[d] as event} 
+                    <div class="w-full relative border-r border-rgba2 bg-gray2" style:height="{60 * 1.0 * 24}px" class:weekend={[0, 6].includes(currentDate.getDay())} data-id={d} class:creating-new-event={creatingEventIn === d.toString()} on:mouseenter={Viewport.onColumnMouseEnter} on:mousemove={Viewport.onColumnMouseMove} on:mouseleave={Viewport.onColumnMouseLeave} on:mousedown={Viewport.onColumnMouseDown} on:mouseup={Viewport.onColumnMouseUp}>
+                        {#each days[d] as event, i} 
                             {@const startTime = Math.min(event.startTime, event.endTime)}
                             {@const height = Math.abs(event.startTime - event.endTime)}
                             
@@ -283,13 +331,18 @@
                         
                             <div 
                                 class:translucent={$app.creatingNewEvent} 
-                                class="{event.color} calendar-event cursor-grab transition-opacity duration-300 ease-ease absolute w-[calc(100%-4px)] left-1 rounded flex flex-row gap-1.5 p-[3px] select-none" 
-                                style:top="{startTime - (startTime % 15)}px"
-                                style:height="{height - (height % 15)}px"
+                                class="{event.color} calendar-event overflow-hidden cursor-grab transition-opacity duration-300 ease-ease absolute w-[calc(100%-4px)] left-1 rounded flex flex-row gap-1.5 p-[3px] select-none" 
+                                style:top="{startTime}px"
+                                style:height="{height}px"
+                                data-id={i}
+                                on:mousedown|self={e => {
+                                    Viewport.onEventMouseDown(e, d, i);
+                                    Viewport.setDragging(DraggingEvent.WHOLE);
+                                }}
                             >
-                                <div data-color class="h-full rounded-sm w-[4px]"></div>
+                                <div data-color class="pointer-events-none h-full rounded-sm w-[4px]"></div>
                                 
-                                <div class="flex flex-col py-0.5">
+                                <div class="pointer-events-none flex flex-col py-0.5">
                                     <p data-title class="text-xs leading-4 ">{event.title}</p>
                                     <p data-description class="text-xs leading-4 ">{event.description}</p>
                                     <p data-timestamp class="text-[11px] leading-4 ">
@@ -309,10 +362,20 @@
                                         }
                                     </p>
                                 </div>
+
+                                <div class="w-full absolute bottom-0 h-1.5 cursor-ns-resize z-50 left-0" on:mousedown={e => {
+                                    Viewport.onEventMouseDown(e, d, i);
+                                    Viewport.setDragging(DraggingEvent.BOTTOM);
+                                }}></div>
+
+                                <div class="w-full absolute top-0 h-1.5 cursor-ns-resize z-50 left-0" on:mousedown={e => {
+                                    Viewport.onEventMouseDown(e, d, i);
+                                    Viewport.setDragging(DraggingEvent.TOP);
+                                }}></div>
                             </div>
                         {/each}
                         
-                        {#if $app.creatingNewEvent && creatingEventIn === d.toString() && showCreatingEventHandle}
+                        {#if $app.creatingNewEvent && creatingEventIn === d.toString() && creatingEventHandleShow}
                             <div class="absolute w-[calc(100%-4px)] left-1 rounded h-[3px] bg-[rgba(255,255,255,0.5)] z-50" style:top="{creatingEventHandlePosition}px"></div>
                         {/if}
 
@@ -320,13 +383,13 @@
                             {@const startTime_ = Math.min(creatingEventEndPosition, creatingEventStartPosition)}
                             {@const height_ = Math.abs(creatingEventStartPosition - creatingEventEndPosition)}
 
-                            {@const startTime = startTime_ - (startTime_ % 15)}
-                            {@const height = height_ - (height_ % 15)}
+                            {@const startTime = startTime_}
+                            {@const height = height_}
 
                             {@const finalStartTime = startTime}
                             {@const finalEndTime = startTime + height}
 
-                            <div style:top="{startTime}px" style:height="{height}px" class:align-vertical={height <= 30} class="gray calendar-event draggable-event overflow-hidden absolute w-[calc(100%-4px)] left-1 bg-[#2F4655] rounded flex flex-row gap-1.5 p-[3px] select-none pointer-events-none">
+                            <div style:top="{startTime}px" style:height="{height}px" class:align-vertical={height <= 30} class="gray calendar-event  overflow-hidden absolute w-[calc(100%-4px)] left-1 bg-[#2F4655] rounded flex flex-row gap-1.5 p-[3px] select-none pointer-events-none">
                                 <div data-color class="h-full rounded-sm w-[4px]"></div>
                                 <div class="flex flex-col py-0.5">
                                     {#if height > 30}
@@ -353,7 +416,7 @@
                             </div>
                         {/if}
 
-                        {#each [...Array(24).keys()] as i} 
+                        {#each [...Array(23).keys()] as i} 
                             <div class="h-[1px] w-full bg-rgba1 absolute z-10" style:top="{60 * 1.0 * (i + 1)}px"></div>
                         {/each}
                     </div>
@@ -381,10 +444,6 @@
     .translucent {
         opacity: 50%;
         pointer-events: none;
-    }
-
-    .draggable-event {
-        transition: height 75ms var(--ease), top 75ms var(--ease);
     }
 
     .align-vertical {

@@ -13,6 +13,12 @@ interface State {
     creatingNewEvent: boolean,
 }
 
+export enum DraggingEvent {
+    BOTTOM,
+    TOP,
+    WHOLE,
+}
+
 export interface CalendarEvent {
     startTime: number;
     endTime: number;
