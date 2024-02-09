@@ -74,7 +74,7 @@
 
             setTimeout(() => {
                 // check if user scrolled in the last `snapThreshold` milliseconds, snap if false
-                if ((Date.now() - lastScrollTime) < snapThreshold) {
+                if (((Date.now() - lastScrollTime) < snapThreshold) && !viewportHeld) {
                     viewport.scroll({
                         left: ((viewport.scrollLeft % columnWidth) < (columnWidth/2)) // decide whether to snap on the left or right
                             ? (viewport.scrollLeft - (viewport.scrollLeft % columnWidth)) + 1
@@ -102,6 +102,24 @@
 
         static onMouseUp() {
             viewportHeld = false;
+
+            lastScrollLeft = viewport.scrollLeft;
+            lastScrollTime = Date.now();
+
+            setTimeout(() => {
+                console.log(Date.now(), lastScrollTime, Date.now() - lastScrollTime);
+                
+                // check if user scrolled in the last `snapThreshold` milliseconds, snap if false
+                if (((Date.now() - lastScrollTime) <= (snapThreshold + 50)) && !viewportHeld) {
+                    viewport.scroll({
+                        left: ((viewport.scrollLeft % columnWidth) < (columnWidth/2)) // decide whether to snap on the left or right
+                            ? (viewport.scrollLeft - (viewport.scrollLeft % columnWidth)) + 1
+                            : (viewport.scrollLeft + columnWidth - (viewport.scrollLeft % columnWidth)) + 1,
+                        top: viewport.scrollTop,
+                        behavior: 'smooth',
+                    });
+                }
+            }, snapThreshold);
         }
 
         static onMouseMove(event: MouseEvent) {
