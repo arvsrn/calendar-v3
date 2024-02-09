@@ -5,6 +5,7 @@
     import Timezones from "./Timezones.svelte";
     import { Calendar, DropdownMenu } from "bits-ui";
     import { slide } from "svelte/transition";
+    import { clickOutside, snapToGrid } from "$lib/util";
     
     export let scroll = 0;
 
@@ -28,6 +29,8 @@
     let editEventDragging: string | null;
     let editEventDraggingHandle: DraggingEvent;
 
+    let lastEventMouseDown: number = 0;
+
     let days: Array<CalendarEvent[]> = [];
     
     for (let i = 0; i < 10; i++) {
@@ -47,7 +50,7 @@
     onMount(() => {
         mounted = true;
 
-        columnWidth = viewport.clientWidth / 8;
+        columnWidth = viewport.clientWidth / $app.days;
     });
 
     const clearSelection = () => {
@@ -111,8 +114,6 @@
             if (editEventDragging && editEventIn) {
                 const column = parseInt(editEventIn);
                 const event_ = parseInt(editEventDragging);
-
-                console.log(editEventDraggingHandle);
                 
                 switch (editEventDraggingHandle) {
                     case DraggingEvent.BOTTOM:
@@ -159,7 +160,7 @@
             creatingEventDragging = false;
             creatingEventHandleShow = true;
             
-            if (creatingEventIn && $app.creatingNewEvent)
+            if (creatingEventIn && $app.creatingNewEvent) {
                 days[parseInt(creatingEventIn)] = [...days[parseInt(creatingEventIn)], {
                     startTime: creatingEventStartPosition,
                     endTime: creatingEventEndPosition,
@@ -167,6 +168,7 @@
                     description: '',
                     color: 'gray'
                 }];
+            }
 
             $app.creatingNewEvent = false;
 
@@ -180,6 +182,8 @@
             $app.creatingNewEvent = true;
         } else if (event.key === "Escape") {
             $app.creatingNewEvent = false;
+            creatingEventDragging = false;
+            creatingEventHandleShow = false;
         }
     }
 </script>
@@ -295,21 +299,13 @@
             {#each [...Array(8+2).keys()] as d} 
                 {@const currentDate = new Date(start + (d * day))}
 
-                <div id="floating" class="fixed top-[52px] h-[60px] w-fit flex flex-col z-50 right-0 bg-transparent">
+                <div id="floating" class="fixed top-[52px] h-9 w-fit flex flex-col z-50 right-0 bg-transparent">
                     <div class="h-9 w-fit flex items-center justify-center">
                         <button class="w-6 h-6 rounded-md bg-transparent hover:bg-rgba3 flex items-center justify-center">
                             <svg width="21" height="21" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M14 9.5H7M10.5 13V6M7 14.5H14" stroke="#A0A0A0"/>
                             </svg>       
                         </button>                     
-                    </div>
-                    <div class="h-6 w-fit flex items-center justify-center">
-                        <button class="w-6 h-6 rounded-md bg-transparent hover:bg-rgba3 flex items-center justify-center">
-                            <svg width="21" height="21" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M8 9L10.5 6.5L13 9" stroke="#A0A0A0"/>
-                                <path d="M13 12L10.5 14.5L8 12" stroke="#A0A0A0"/>
-                            </svg>
-                        </button>                                               
                     </div>
                 </div>
 
@@ -323,21 +319,30 @@
 
                     <div class="w-full relative border-r border-rgba2 bg-gray2" style:height="{60 * 1.0 * 24}px" class:weekend={[0, 6].includes(currentDate.getDay())} data-id={d} class:creating-new-event={creatingEventIn === d.toString()} on:mouseenter={Viewport.onColumnMouseEnter} on:mousemove={Viewport.onColumnMouseMove} on:mouseleave={Viewport.onColumnMouseLeave} on:mousedown={Viewport.onColumnMouseDown} on:mouseup={Viewport.onColumnMouseUp}>
                         {#each days[d] as event, i} 
-                            {@const startTime = Math.min(event.startTime, event.endTime)}
-                            {@const height = Math.abs(event.startTime - event.endTime)}
-                            
-                            {@const finalStartTime = event.startTime}
-                            {@const finalEndTime = event.endTime}
+                            {@const startTime = snapToGrid(Math.min(event.startTime, event.endTime))}
+                            {@const endTime = snapToGrid(Math.max(event.startTime, event.endTime))}
                         
                             <div 
                                 class:translucent={$app.creatingNewEvent} 
+                                class:selected={$app.eventSelected?.[0] === d && $app.eventSelected[1] === i}
                                 class="{event.color} calendar-event overflow-hidden cursor-grab transition-opacity duration-300 ease-ease absolute w-[calc(100%-4px)] left-1 rounded flex flex-row gap-1.5 p-[3px] select-none" 
                                 style:top="{startTime}px"
-                                style:height="{height}px"
+                                style:height="{endTime - startTime}px"
                                 data-id={i}
+                                use:clickOutside={e => {
+                                    // @ts-ignore
+                                    if (!!$app.eventSelected && (!(document.getElementById('sidebar')?.contains(e.target) || document.getElementById('sidebar') === e.target || document.getElementById('sidebar-clickable')?.contains(e.target) || document.getElementById('sidebar-clickable') === e.target))) {
+                                        $app.eventSelected = null;
+                                    }
+                                }}
                                 on:mousedown|self={e => {
                                     Viewport.onEventMouseDown(e, d, i);
                                     Viewport.setDragging(DraggingEvent.WHOLE);
+                                    lastEventMouseDown = Date.now();
+                                }}
+                                on:mouseup={() => {
+                                    if (Date.now() - lastEventMouseDown < 350) 
+                                        setTimeout(() => $app.eventSelected = [d, i], 10);
                                 }}
                             >
                                 <div data-color class="pointer-events-none h-full rounded-sm w-[4px]"></div>
@@ -347,28 +352,28 @@
                                     <p data-description class="text-xs leading-4 ">{event.description}</p>
                                     <p data-timestamp class="text-[11px] leading-4 ">
                                         {
-                                            Math.floor(finalStartTime/60) <= 12 ? 
-                                                Math.floor(finalStartTime/60) 
-                                                : Math.floor(finalStartTime/60) - 12
-                                        }{Math.floor(((finalStartTime/60)%1)*60) !== 0 ? `:${Math.floor(((finalStartTime/60)%1)*60) < 10 ? '0' + Math.floor(((finalStartTime/60)%1)*60) : Math.floor(((finalStartTime/60)%1)*60)}` : ''}{
-                                            (Math.floor(finalEndTime/60) < 12 ? 'AM' : 'PM') ===
-                                            (Math.floor(finalStartTime/60) < 12 ? 'AM' : 'PM') ? '' : (Math.floor(finalStartTime/60) < 12 ? 'AM' : 'PM')
+                                            Math.floor(startTime/60) <= 12 ? 
+                                                Math.floor(startTime/60) 
+                                                : Math.floor(startTime/60) - 12
+                                        }{Math.floor(((startTime/60)%1)*60) !== 0 ? `:${Math.floor(((startTime/60)%1)*60) < 10 ? '0' + Math.floor(((startTime/60)%1)*60) : Math.floor(((startTime/60)%1)*60)}` : ''}{
+                                            (Math.floor(endTime/60) < 12 ? 'AM' : 'PM') ===
+                                            (Math.floor(startTime/60) < 12 ? 'AM' : 'PM') ? '' : (Math.floor(startTime/60) < 12 ? 'AM' : 'PM')
                                         }—{
-                                            Math.floor(finalEndTime/60) <= 12 ? 
-                                                Math.floor(finalEndTime/60) 
-                                                : Math.floor(finalEndTime/60) - 12
-                                        }{Math.floor(((finalEndTime/60)%1)*60) !== 0 ? `:${Math.floor(((finalEndTime/60)%1)*60) < 10 ? '0' + Math.floor(((finalEndTime/60)%1)*60) : Math.floor(((finalEndTime/60)%1)*60)}` : ''}{
-                                            Math.floor(finalEndTime/60) < 12 ? 'AM' : 'PM'
+                                            Math.floor(endTime/60) <= 12 ? 
+                                                Math.floor(endTime/60) 
+                                                : Math.floor(endTime/60) - 12
+                                        }{Math.floor(((endTime/60)%1)*60) !== 0 ? `:${Math.floor(((endTime/60)%1)*60) < 10 ? '0' + Math.floor(((endTime/60)%1)*60) : Math.floor(((endTime/60)%1)*60)}` : ''}{
+                                            Math.floor(endTime/60) < 12 ? 'AM' : 'PM'
                                         }
                                     </p>
                                 </div>
 
-                                <div class="w-full absolute bottom-0 h-1.5 cursor-ns-resize z-50 left-0" on:mousedown={e => {
+                                <div class="w-full absolute bottom-0 h-2 cursor-ns-resize z-50 left-0" on:mousedown={e => {
                                     Viewport.onEventMouseDown(e, d, i);
                                     Viewport.setDragging(DraggingEvent.BOTTOM);
                                 }}></div>
 
-                                <div class="w-full absolute top-0 h-1.5 cursor-ns-resize z-50 left-0" on:mousedown={e => {
+                                <div class="w-full absolute top-0 h-2 cursor-ns-resize z-50 left-0" on:mousedown={e => {
                                     Viewport.onEventMouseDown(e, d, i);
                                     Viewport.setDragging(DraggingEvent.TOP);
                                 }}></div>
@@ -380,36 +385,30 @@
                         {/if}
 
                         {#if creatingEventDragging && creatingEventIn === d.toString()} 
-                            {@const startTime_ = Math.min(creatingEventEndPosition, creatingEventStartPosition)}
-                            {@const height_ = Math.abs(creatingEventStartPosition - creatingEventEndPosition)}
+                            {@const startTime = snapToGrid(Math.min(creatingEventEndPosition, creatingEventStartPosition))}
+                            {@const endTime = snapToGrid(Math.max(creatingEventEndPosition, creatingEventStartPosition))}
 
-                            {@const startTime = startTime_}
-                            {@const height = height_}
-
-                            {@const finalStartTime = startTime}
-                            {@const finalEndTime = startTime + height}
-
-                            <div style:top="{startTime}px" style:height="{height}px" class:align-vertical={height <= 30} class="gray calendar-event  overflow-hidden absolute w-[calc(100%-4px)] left-1 bg-[#2F4655] rounded flex flex-row gap-1.5 p-[3px] select-none pointer-events-none">
+                            <div style:top="{startTime}px" style:height="{endTime - startTime}px" class:align-vertical={(endTime - startTime) <= 30} class="gray calendar-event overflow-hidden absolute w-[calc(100%-4px)] left-1 bg-[#2F4655] rounded flex flex-row gap-1.5 p-[3px] select-none pointer-events-none">
                                 <div data-color class="h-full rounded-sm w-[4px]"></div>
                                 <div class="flex flex-col py-0.5">
-                                    {#if height > 30}
+                                    {#if (endTime - startTime) > 30}
                                         <p data-title class="text-xs leading-4" transition:slide={{ duration: 300 }}>New Event</p>
                                     {/if}
                                     
                                     <p data-timestamp class="text-[11px] leading-4 ">
                                         {
-                                            Math.floor(finalStartTime/60) <= 12 ? 
-                                                Math.floor(finalStartTime/60) 
-                                                : Math.floor(finalStartTime/60) - 12
-                                        }{Math.floor(((finalStartTime/60)%1)*60) !== 0 ? `:${Math.floor(((finalStartTime/60)%1)*60) < 10 ? '0' + Math.floor(((finalStartTime/60)%1)*60) : Math.floor(((finalStartTime/60)%1)*60)}` : ''}{
-                                            (Math.floor(finalEndTime/60) < 12 ? 'AM' : 'PM') ===
-                                            (Math.floor(finalStartTime/60) < 12 ? 'AM' : 'PM') ? '' : (Math.floor(finalStartTime/60) < 12 ? 'AM' : 'PM')
+                                            Math.floor(startTime/60) <= 12 ? 
+                                                Math.floor(startTime/60) 
+                                                : Math.floor(startTime/60) - 12
+                                        }{Math.floor(((startTime/60)%1)*60) !== 0 ? `:${Math.floor(((startTime/60)%1)*60) < 10 ? '0' + Math.floor(((startTime/60)%1)*60) : Math.floor(((startTime/60)%1)*60)}` : ''}{
+                                            (Math.floor(endTime/60) < 12 ? 'AM' : 'PM') ===
+                                            (Math.floor(startTime/60) < 12 ? 'AM' : 'PM') ? '' : (Math.floor(startTime/60) < 12 ? 'AM' : 'PM')
                                         }—{
-                                            Math.floor(finalEndTime/60) <= 12 ? 
-                                                Math.floor(finalEndTime/60) 
-                                                : Math.floor(finalEndTime/60) - 12
-                                        }{Math.floor(((finalEndTime/60)%1)*60) !== 0 ? `:${Math.floor(((finalEndTime/60)%1)*60) < 10 ? '0' + Math.floor(((finalEndTime/60)%1)*60) : Math.floor(((finalEndTime/60)%1)*60)}` : ''}{
-                                            Math.floor(finalEndTime/60) < 12 ? 'AM' : 'PM'
+                                            Math.floor(endTime/60) <= 12 ? 
+                                                Math.floor(endTime/60) 
+                                                : Math.floor(endTime/60) - 12
+                                        }{Math.floor(((endTime/60)%1)*60) !== 0 ? `:${Math.floor(((endTime/60)%1)*60) < 10 ? '0' + Math.floor(((endTime/60)%1)*60) : Math.floor(((endTime/60)%1)*60)}` : ''}{
+                                            Math.floor(endTime/60) < 12 ? 'AM' : 'PM'
                                         }
                                     </p>
                                 </div>
@@ -479,7 +478,12 @@
     }
     
     .calendar-event {
+        border: 1px solid transparent;
         background: color-mix(in srgb, var(--color) 20%, #202020);
+    }
+
+    .calendar-event.selected {
+        border: 1px solid var(--color);
     }
 
     .calendar-event > [data-color] {

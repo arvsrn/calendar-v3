@@ -5,18 +5,26 @@ export type Month = 'January' | 'February' | 'March' | 'April' | 'May' | 'June' 
 interface State {
     currentYear: number;
     currentMonth: Month;
-    eventSelected: boolean;
+    eventSelected: [number, number] | null;
 
     zoom: number; // percentage
     days: number;
     showingSettings: boolean;
     creatingNewEvent: boolean,
+
+    sidebar: SidebarState;
 }
 
 export enum DraggingEvent {
     BOTTOM,
     TOP,
     WHOLE,
+}
+
+export enum SidebarState {
+    TASKS,
+    CHAT,
+    EMAIL,
 }
 
 export interface CalendarEvent {
@@ -30,11 +38,12 @@ export interface CalendarEvent {
 export let app: Writable<State> = writable({
     currentYear: 2024,
     currentMonth: 'February',
-    eventSelected: false,
+    eventSelected: null,
     zoom: 100,
-    days: 5,
+    days: 4,
     showingSettings: false,
     creatingNewEvent: false,
+    sidebar: SidebarState.TASKS,
 });
 
 export const monthNames: Array<Month> = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
