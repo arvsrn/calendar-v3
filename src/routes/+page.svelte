@@ -14,8 +14,11 @@
     let mounted: boolean;
     let columnWidth: number = 139;
 
-    const snapThreshold = 250;
+    const snapThreshold = 300;
     const day = 8_64_00_000; // one day in milliseconds
+
+    let lastScrollLeft = 0;
+    let lastScrollTime = Date.now();
 
     let viewportHeld: boolean = false;
     
@@ -58,8 +61,6 @@
         setColumnWidth();
     });
 
-    
-
     class Viewport {
         static onScroll(event: Event) {
             // infinite scrolling
@@ -70,6 +71,22 @@
                 start += day; // one day in ms
                 viewport.scroll(columnWidth, viewport.scrollTop);
             }
+
+            setTimeout(() => {
+                // check if user scrolled in the last `snapThreshold` milliseconds, snap if false
+                if ((Date.now() - lastScrollTime) < snapThreshold) {
+                    viewport.scroll({
+                        left: ((viewport.scrollLeft % columnWidth) < (columnWidth/2)) // decide whether to snap on the left or right
+                            ? (viewport.scrollLeft - (viewport.scrollLeft % columnWidth)) + 1
+                            : (viewport.scrollLeft + columnWidth - (viewport.scrollLeft % columnWidth)) + 1,
+                        top: viewport.scrollTop,
+                        behavior: 'smooth',
+                    });
+                }
+            }, snapThreshold);
+
+            lastScrollLeft = viewport.scrollLeft;
+            lastScrollTime = Date.now();
 
             const currentDate = new Date(start);
             $app.currentMonth = monthNames[currentDate.getMonth()];
