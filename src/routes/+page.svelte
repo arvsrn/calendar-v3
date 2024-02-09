@@ -59,6 +59,7 @@
     onMount(() => {
         mounted = true;
         setColumnWidth();
+        viewport.scroll(columnWidth, 0)
     });
 
     class Viewport {
@@ -107,8 +108,6 @@
             lastScrollTime = Date.now();
 
             setTimeout(() => {
-                console.log(Date.now(), lastScrollTime, Date.now() - lastScrollTime);
-                
                 // check if user scrolled in the last `snapThreshold` milliseconds, snap if false
                 if (((Date.now() - lastScrollTime) <= (snapThreshold + 50)) && !viewportHeld) {
                     viewport.scroll({
@@ -222,7 +221,6 @@
         }
     }
 
-    $: console.log($app.days);
     $: $app.days, setColumnWidth();
 </script>
 

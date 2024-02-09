@@ -40,7 +40,7 @@ export let app: Writable<State> = writable({
     currentMonth: 'February',
     eventSelected: null,
     zoom: 100,
-    days: 4,
+    days: 6,
     showingSettings: false,
     creatingNewEvent: false,
     sidebar: SidebarState.TASKS,

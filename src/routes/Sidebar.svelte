@@ -119,7 +119,7 @@
             <button class="ml-auto h-6 w-fit px-2 rounded-md border border-rgba2 text-gray5 text-xs hover:bg-rgba2 hover:border-transparent select-none" on:click={() => $app.eventSelected = null}>Back</button>
         </div>
         <div class="w-full h-fit px-6 py-4 flex flex-col gap-2">
-            <Input placeholder="Title" />
+            <Input placeholder="Title" value="New Event" />
             <Input placeholder="Description" />
             <Input placeholder="Location" />
         </div>
