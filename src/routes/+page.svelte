@@ -5,7 +5,8 @@
     import Timezones from "./Timezones.svelte";
     import { Calendar, DropdownMenu } from "bits-ui";
     import { slide } from "svelte/transition";
-    import { clickOutside, snapToGrid } from "$lib/util";
+    import { clickOutside, snapToGrid, clearSelection } from "$lib/util";
+    import RangeInput from "./RangeInput.svelte"
     
     export let scroll = 0;
 
@@ -47,18 +48,17 @@
 
     let start = Date.now();
 
+    const setColumnWidth = () => {
+        if (mounted)
+            columnWidth = viewport.clientWidth / $app.days;
+    };
+
     onMount(() => {
         mounted = true;
-
-        columnWidth = viewport.clientWidth / $app.days;
+        setColumnWidth();
     });
 
-    const clearSelection = () => {
-        if (window.getSelection) window.getSelection()?.removeAllRanges();
-
-        // @ts-ignore
-        else if (document.selection) document.selection.empty() ;
-    }
+    
 
     class Viewport {
         static onScroll(event: Event) {
@@ -186,6 +186,9 @@
             creatingEventHandleShow = false;
         }
     }
+
+    $: console.log($app.days);
+    $: $app.days, setColumnWidth();
 </script>
 
 <main class="w-screen h-screen flex flex-row bg-gray2">
@@ -275,6 +278,9 @@
             </div>
 
             <div class="flex flex-row ml-auto gap-2">
+                <div class="h-6">
+                    <RangeInput bind:value={$app.days} />
+                </div>
                 <button on:click={() => $app.creatingNewEvent = !$app.creatingNewEvent} class="h-6 w-fit px-2 pr-[5px] rounded-md bg-[#0C8CE9] text-white text-xs font-medium hover:bg-[#5EB3EF] hover:border-transparent select-none flex flex-row items-center justify-center gap-1.5">
                     {#if $app.creatingNewEvent}
                         Cancel
@@ -296,18 +302,8 @@
 
         <!-- svelte-ignore a11y-no-static-element-interactions -->
         <div bind:this={viewport} class="w-full h-full flex flex-row overflow-scroll scrollbar-hidden relative" on:mousedown={Viewport.onMouseDown} on:scroll|preventDefault={Viewport.onScroll}>
-            {#each [...Array(8+2).keys()] as d} 
+            {#each [...Array($app.days+2).keys()] as d} 
                 {@const currentDate = new Date(start + (d * day))}
-
-                <div id="floating" class="fixed top-[52px] h-9 w-fit flex flex-col z-50 right-0 bg-transparent">
-                    <div class="h-9 w-fit flex items-center justify-center">
-                        <button class="w-6 h-6 rounded-md bg-transparent hover:bg-rgba3 flex items-center justify-center">
-                            <svg width="21" height="21" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M14 9.5H7M10.5 13V6M7 14.5H14" stroke="#A0A0A0"/>
-                            </svg>       
-                        </button>                     
-                    </div>
-                </div>
 
                 <div class="h-screen flex-none" style:width="{columnWidth}px">
                     <div class="w-full sticky top-0 z-20">
@@ -425,7 +421,7 @@
     </div>
 </main>
 
-<svelte:window on:mousemove={Viewport.onMouseMove} on:mouseup={Viewport.onMouseUp} on:keydown={shortcuts} />
+<svelte:window on:mousemove={Viewport.onMouseMove} on:mouseup={Viewport.onMouseUp} on:keydown={shortcuts} on:resize={setColumnWidth} />
 
 <style>
     .scrollbar-hidden::-webkit-scrollbar {

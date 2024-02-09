@@ -17,3 +17,10 @@ export function clickOutside(node: HTMLElement, handler: (e: MouseEvent) => void
 };
 
 export const snapToGrid = (x: number): number => Math.ceil(x / 15) * 15;
+
+export const clearSelection = () => {
+    if (window.getSelection) window.getSelection()?.removeAllRanges();
+
+    // @ts-ignore
+    else if (document.selection) document.selection.empty() ;
+}
